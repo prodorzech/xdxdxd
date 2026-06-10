@@ -1,36 +1,36 @@
--- Bezpieczne ładowanie Rayfield (z zabezpieczeniem przed błędami)
-local RayfieldLoaded = pcall(function()
+--[[
+    POPRAWIONY SKRYPT LEMON TYCOON
+    MVP Mafia
+]]
+
+-- Bezpieczne ładowanie Rayfield
+local success, Rayfield = pcall(function()
     return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 end)
 
-if not RayfieldLoaded then
-    warn("Nie udało się załadować Rayfield. Sprawdź połączenie.")
+if not success then
     return
 end
 
-local Rayfield = RayfieldLoaded
-
--- Tworzenie okna GUI z domyślnym motywem (szary)
+-- Tworzenie GUI
 local Window = Rayfield:CreateWindow({
-    Name = "Lemon Fucks",
+    Name = "Lemon Fucks v2",
     LoadingTitle = "MVP Mafia Presents",
     LoadingSubtitle = "By MVP Mafia",
-    ConfigurationSaving = { Enabled = false },
+    ConfigurationSaving = { Enabled = false, FolderName = nil, FileName = "LemonFucks" },
     KeySystem = false,
-    Theme = "Default" -- Wymusza szary motyw
 })
 
--- Tworzenie zakładek
 local MainTab = Window:CreateTab("Main", 4483362458)
 local FlyTab = Window:CreateTab("Fly", 4483362458)
 
--- Zmienne globalne
+-- Services
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
--- Znajdź własny tycoon
+-- Znajdź swój Tycoon
 local userTycoon
 for _, v in pairs(workspace:GetChildren()) do
     if v:IsA("Folder") and v.Name:match("Tycoon%d") then
@@ -42,15 +42,14 @@ for _, v in pairs(workspace:GetChildren()) do
 end
 
 if not userTycoon then
-    Rayfield:Notify({ Title = "Error", Content = "Tycoon not found!", Duration = 5 })
+    Rayfield:Notify({ Title = "Error", Content = "Twój Tycoon nie został znaleziony!", Duration = 5 })
     return
 end
 
--- Zmienne dla funkcji tycoon
+-- Zmienne
 local AutoBuy = false
 local AutoUpgrade = false
 local AutoFruit = false
-local Buying = false
 
 -- Zmienne do latania
 local flying = false
@@ -62,18 +61,14 @@ local flyConnection = nil
 local flyMoveConnection = nil
 local flyInputEndedConnection = nil
 
--- --- Funkcje tycoon (oryginalne, ale zabezpieczone) ---
+-- Funkcje Tycoon
 local function getButtons()
     local Buttons = {}
     for _, obj in ipairs(userTycoon.Purchases:GetDescendants()) do
-        if obj:IsA("Model") then
-            local shown = obj:GetAttribute("Shown")
-            local purchased = obj:GetAttribute("Purchased")
-            if shown == true and purchased ~= true then
-                local buttonPart = obj:FindFirstChild("Button")
-                if buttonPart and buttonPart:IsA("BasePart") then
-                    table.insert(Buttons, buttonPart)
-                end
+        if obj:IsA("Model") and obj:GetAttribute("Shown") == true and obj:GetAttribute("Purchased") ~= true then
+            local buttonPart = obj:FindFirstChild("Button")
+            if buttonPart and buttonPart:IsA("BasePart") then
+                table.insert(Buttons, buttonPart)
             end
         end
     end
@@ -81,31 +76,15 @@ local function getButtons()
 end
 
 local function buyButton(buttonPart)
-    if Buying then return end
-    Buying = true
     local character = LocalPlayer.Character
-    if character then
-        local hrp = character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            pcall(function()
-                firetouchinterest(hrp, buttonPart, 0)
-                firetouchinterest(hrp, buttonPart, 1)
-            end)
-        end
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    if hrp and buttonPart then
+        pcall(function()
+            firetouchinterest(hrp, buttonPart, 0)
+            firetouchinterest(hrp, buttonPart, 1)
+        end)
     end
-    Buying = false
 end
-
-task.spawn(function()
-    while true do
-        task.wait()
-        if AutoBuy then
-            for _, button in ipairs(getButtons()) do
-                pcall(buyButton, button)
-            end
-        end
-    end
-end)
 
 local function upgradeMachines()
     for _, obj in ipairs(userTycoon.Purchases:GetDescendants()) do
@@ -119,15 +98,7 @@ local function upgradeMachines()
     end
 end
 
-task.spawn(function()
-    while true do
-        task.wait(0.5)
-        if AutoUpgrade then
-            pcall(upgradeMachines)
-        end
-    end
-end)
-
+-- Drzewa
 local Trees = {}
 local function addTree(obj)
     if obj:IsA("Model") and obj.Name == "LemonTree" and not table.find(Trees, obj) then
@@ -139,38 +110,43 @@ local function removeTree(obj)
     if idx then table.remove(Trees, idx) end
 end
 
-for _, v in ipairs(workspace:GetDescendants()) do addTree(v) end
 workspace.DescendantAdded:Connect(addTree)
 workspace.DescendantRemoving:Connect(removeTree)
+for _, v in ipairs(workspace:GetDescendants()) do addTree(v) end
 
 local function collectFruit(tree)
     local character = LocalPlayer.Character
-    if not character then return end
-    local hrp = character:FindFirstChild("HumanoidRootPart")
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-    
-    -- Teleport do drzewa
+
     pcall(function()
         hrp.CFrame = tree:GetPivot() + Vector3.new(0, 5, 0)
-    end)
-    
-    -- Zbieranie owoców
-    for _, obj in ipairs(tree:GetDescendants()) do
-        if obj:IsA("BasePart") and obj.Name == "Fruit" then
-            pcall(function()
-                obj.CanCollide = false
-                local clickPart = obj:FindFirstChild("ClickPart")
-                if clickPart then
-                    local detector = clickPart:FindFirstChildOfClass("ClickDetector")
-                    if detector then
-                        task.wait(0.45)
-                        fireclickdetector(detector)
-                    end
+        task.wait()
+        for _, obj in ipairs(tree:GetDescendants()) do
+            if obj:IsA("BasePart") and obj.Name == "Fruit" then
+                local detector = obj:FindFirstChild("ClickPart", true):FindFirstChildOfClass("ClickDetector")
+                if detector then
+                    fireclickdetector(detector)
                 end
-            end)
+            end
+        end
+    end)
+end
+
+-- Pętle
+task.spawn(function()
+    while true do
+        task.wait()
+        if AutoBuy then
+            for _, buttonPart in ipairs(getButtons()) do
+                pcall(buyButton, buttonPart)
+            end
+        end
+        if AutoUpgrade then
+            pcall(upgradeMachines)
         end
     end
-end
+end)
 
 task.spawn(function()
     while true do
@@ -186,7 +162,7 @@ task.spawn(function()
     end
 end)
 
--- --- Funkcje latania (poprawione sterowanie) ---
+-- Latanie
 local function stopFly()
     if bodyVelocity then bodyVelocity:Destroy() end
     if bodyGyro then bodyGyro:Destroy() end
@@ -198,7 +174,7 @@ local function stopFly()
     flyConnection = nil
     flyMoveConnection = nil
     flyInputEndedConnection = nil
-    
+
     local character = LocalPlayer.Character
     if character then
         local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -209,65 +185,64 @@ local function stopFly()
 end
 
 local function startFly()
-    stopFly() -- Zatrzymaj poprzednie latanie, aby uniknąć konfliktów
-    
+    stopFly()
     local character = LocalPlayer.Character
     if not character then return end
     local hrp = character:FindFirstChild("HumanoidRootPart")
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     if not hrp or not humanoid then return end
-    
+
     humanoid.PlatformStand = true
-    
+
     bodyVelocity = Instance.new("BodyVelocity")
     bodyVelocity.MaxForce = Vector3.new(1e6, 1e6, 1e6)
     bodyVelocity.Parent = hrp
-    
+
     bodyGyro = Instance.new("BodyGyro")
     bodyGyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
     bodyGyro.Parent = hrp
-    
-    local moveVector = Vector3.new()
+
+    local moveVec = Vector3.new()
     local camera = workspace.CurrentCamera
     local keys = { W = false, A = false, S = false, D = false, Space = false, Ctrl = false }
-    
-    local function updateMoveVector()
-        moveVector = Vector3.new(
+
+    local function updateMoveVec()
+        moveVec = Vector3.new(
             (keys.D and 1 or 0) - (keys.A and 1 or 0),
             (keys.Space and 1 or 0) - (keys.Ctrl and 1 or 0),
             (keys.W and 1 or 0) - (keys.S and 1 or 0)
         )
-        if moveVector.Magnitude > 0 then
-            moveVector = moveVector.Unit
+        if moveVec.Magnitude > 0 then
+            moveVec = moveVec.Unit
         end
     end
-    
+
     local function onInputBegan(input, gameProcessed)
         if gameProcessed then return end
         local key = input.KeyCode
-        if key == Enum.KeyCode.W then keys.W = true updateMoveVector()
-        elseif key == Enum.KeyCode.A then keys.A = true updateMoveVector()
-        elseif key == Enum.KeyCode.S then keys.S = true updateMoveVector()
-        elseif key == Enum.KeyCode.D then keys.D = true updateMoveVector()
-        elseif key == Enum.KeyCode.Space then keys.Space = true updateMoveVector()
-        elseif key == Enum.KeyCode.LeftControl then keys.Ctrl = true updateMoveVector()
+        if key == Enum.KeyCode.W then keys.W = true updateMoveVec()
+        elseif key == Enum.KeyCode.A then keys.A = true updateMoveVec()
+        elseif key == Enum.KeyCode.S then keys.S = true updateMoveVec()
+        elseif key == Enum.KeyCode.D then keys.D = true updateMoveVec()
+        elseif key == Enum.KeyCode.Space then keys.Space = true updateMoveVec()
+        elseif key == Enum.KeyCode.LeftControl then keys.Ctrl = true updateMoveVec()
         end
     end
-    
+
     local function onInputEnded(input, gameProcessed)
         local key = input.KeyCode
-        if key == Enum.KeyCode.W then keys.W = false updateMoveVector()
-        elseif key == Enum.KeyCode.A then keys.A = false updateMoveVector()
-        elseif key == Enum.KeyCode.S then keys.S = false updateMoveVector()
-        elseif key == Enum.KeyCode.D then keys.D = false updateMoveVector()
-        elseif key == Enum.KeyCode.Space then keys.Space = false updateMoveVector()
-        elseif key == Enum.KeyCode.LeftControl then keys.Ctrl = false updateMoveVector()
+        if key == Enum.KeyCode.W then keys.W = false updateMoveVec()
+        elseif key == Enum.KeyCode.A then keys.A = false updateMoveVec()
+        elseif key == Enum.KeyCode.S then keys.S = false updateMoveVec()
+        elseif key == Enum.KeyCode.D then keys.D = false updateMoveVec()
+        elseif key == Enum.KeyCode.Space then keys.Space = false updateMoveVec()
+        elseif key == Enum.KeyCode.LeftControl then keys.Ctrl = false updateMoveVec()
         end
     end
-    
+
     flyMoveConnection = UserInputService.InputBegan:Connect(onInputBegan)
     flyInputEndedConnection = UserInputService.InputEnded:Connect(onInputEnded)
-    
+
     flyConnection = RunService.RenderStepped:Connect(function()
         if not flying then return end
         local newChar = LocalPlayer.Character
@@ -278,17 +253,15 @@ local function startFly()
         end
         local newHrp = newChar:FindFirstChild("HumanoidRootPart")
         if not newHrp then return end
-        
+
         local cameraCF = camera.CFrame
         local forward = Vector3.new(cameraCF.LookVector.X, 0, cameraCF.LookVector.Z).Unit
         local right = cameraCF.RightVector
         local up = Vector3.new(0, 1, 0)
-        
-        local direction = (forward * moveVector.Z) + (right * moveVector.X) + (up * moveVector.Y)
-        if direction.Magnitude > 0 then
-            direction = direction.Unit
-        end
-        
+
+        local direction = (forward * moveVec.Z) + (right * moveVec.X) + (up * moveVec.Y)
+        if direction.Magnitude > 0 then direction = direction.Unit end
+
         bodyVelocity.Velocity = direction * flySpeed
         bodyGyro.CFrame = CFrame.lookAt(newHrp.Position, newHrp.Position + cameraCF.LookVector)
     end)
@@ -306,7 +279,6 @@ local function toggleFly()
     end
 end
 
--- Obsługa klawisza do latania
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == flyKey then
@@ -314,7 +286,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- Zatrzymaj latanie po respawnie
 LocalPlayer.CharacterAdded:Connect(function()
     if flying then
         flying = false
@@ -322,13 +293,12 @@ LocalPlayer.CharacterAdded:Connect(function()
     end
 end)
 
--- --- Interfejs użytkownika ---
+-- Interfejs
 MainTab:CreateToggle({
     Name = "Auto Buy",
     CurrentValue = false,
     Flag = "AutoBuy",
-    Callback = function(Value)
-        AutoBuy = Value
+    Callback = function(Value) AutoBuy = Value
         Rayfield:Notify({ Title = "Auto Buy", Content = Value and "Enabled" or "Disabled", Duration = 3 })
     end,
 })
@@ -337,8 +307,7 @@ MainTab:CreateToggle({
     Name = "Auto Upgrade",
     CurrentValue = false,
     Flag = "AutoUpgrade",
-    Callback = function(Value)
-        AutoUpgrade = Value
+    Callback = function(Value) AutoUpgrade = Value
         Rayfield:Notify({ Title = "Auto Upgrade", Content = Value and "Enabled" or "Disabled", Duration = 3 })
     end,
 })
@@ -347,8 +316,7 @@ MainTab:CreateToggle({
     Name = "Auto Fruit",
     CurrentValue = false,
     Flag = "AutoFruit",
-    Callback = function(Value)
-        AutoFruit = Value
+    Callback = function(Value) AutoFruit = Value
         Rayfield:Notify({ Title = "Auto Fruit", Content = Value and "Enabled" or "Disabled", Duration = 3 })
     end,
 })
@@ -360,7 +328,6 @@ MainTab:CreateButton({
     end,
 })
 
--- Elementy w zakładce Fly
 local keyDisplay = FlyTab:CreateParagraph({
     Title = "Current Fly Key",
     Content = tostring(flyKey):gsub("Enum.KeyCode.", ""),
@@ -386,9 +353,7 @@ FlyTab:CreateSlider({
     Suffix = "studs/s",
     CurrentValue = flySpeed,
     Flag = "FlySpeed",
-    Callback = function(Value)
-        flySpeed = Value
-    end,
+    Callback = function(Value) flySpeed = Value end,
 })
 
 FlyTab:CreateButton({
@@ -406,14 +371,8 @@ FlyTab:CreateButton({
             Rayfield:Notify({ Title = "Fly Keybind", Content = "Set to " .. tostring(flyKey), Duration = 3 })
             conn:Disconnect()
         end)
-        task.delay(5, function()
-            if conn then conn:Disconnect() end
-        end)
+        task.delay(5, function() if conn then conn:Disconnect() end end)
     end,
 })
 
-Rayfield:Notify({
-    Title = "Loaded",
-    Content = "Skrypt działa! W/S w locie poprawione.",
-    Duration = 5,
-})
+Rayfield:Notify({ Title = "Loaded", Content = "Skrypt działa! (W/S poprawione)", Duration = 5 })
