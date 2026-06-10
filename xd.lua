@@ -232,16 +232,17 @@ local function startFly()
 	local moveVector = Vector3.new(0,0,0)
 	local camera = workspace.CurrentCamera
 
-	local keys = { W = false, A = false, S = false, D = false, Space = false, Ctrl = false }
+	local keys = { W = false, A = false, S = false, D = false }
 	local function updateMoveVector()
-    	moveVector = Vector3.new(
-    	    (keys.D and 1 or 0) - (keys.A and 1 or 0),
-    	    (keys.Space and 1 or 0) - (keys.Ctrl and 1 or 0),
-    	    (keys.W and 1 or 0) - (keys.S and 1 or 0) -- Zamieniono S i W miejscami
-    	)
-    	if moveVector.Magnitude > 0 then
-    	    moveVector = moveVector.Unit
-    	end
+		-- Usunięto Space i Ctrl – zostaje tylko sterowanie horyzontalne z klawiatury
+		moveVector = Vector3.new(
+			(keys.D and 1 or 0) - (keys.A and 1 or 0),
+			0,
+			(keys.W and 1 or 0) - (keys.S and 1 or 0)
+		)
+		if moveVector.Magnitude > 0 then
+			moveVector = moveVector.Unit
+		end
 	end
 
 	local function onInputBegan(input, gameProcessed)
@@ -251,8 +252,6 @@ local function startFly()
 		elseif key == Enum.KeyCode.A then keys.A = true updateMoveVector()
 		elseif key == Enum.KeyCode.S then keys.S = true updateMoveVector()
 		elseif key == Enum.KeyCode.D then keys.D = true updateMoveVector()
-		elseif key == Enum.KeyCode.Space then keys.Space = true updateMoveVector()
-		elseif key == Enum.KeyCode.LeftControl then keys.Ctrl = true updateMoveVector()
 		end
 	end
 
@@ -262,8 +261,6 @@ local function startFly()
 		elseif key == Enum.KeyCode.A then keys.A = false updateMoveVector()
 		elseif key == Enum.KeyCode.S then keys.S = false updateMoveVector()
 		elseif key == Enum.KeyCode.D then keys.D = false updateMoveVector()
-		elseif key == Enum.KeyCode.Space then keys.Space = false updateMoveVector()
-		elseif key == Enum.KeyCode.LeftControl then keys.Ctrl = false updateMoveVector()
 		end
 	end
 
@@ -283,17 +280,16 @@ local function startFly()
 		if not newHrp or not newHumanoid then return end
 
 		local cameraCF = camera.CFrame
-		local lookVector = cameraCF.LookVector
-		local forward = Vector3.new(lookVector.X, 0, lookVector.Z).Unit
+		local lookVector = cameraCF.LookVector -- Używamy pełnego LookVector kamery (w tym góra/dół)
 		local right = cameraCF.RightVector
-		local up = Vector3.new(0,1,0)
 
-		local direction = (forward * moveVector.Z + right * moveVector.X + up * moveVector.Y)
+		-- Sterowanie 3D za pomocą kierunku myszki (kamery)
+		local direction = (lookVector * moveVector.Z + right * moveVector.X)
 		if direction.Magnitude > 0 then
 			direction = direction.Unit
 		end
 		bodyVelocity.Velocity = direction * flySpeed
-		bodyGyro.CFrame = CFrame.lookAt(newHrp.Position, newHrp.Position + cameraCF.LookVector)
+		bodyGyro.CFrame = cameraCF
 	end)
 end
 
@@ -305,7 +301,7 @@ local function toggleFly()
 	else
 		flying = true
 		startFly()
-		Rayfield:Notify({ Title = "Fly", Content = "Enabled (WASD + Space/Ctrl)", Duration = 2 })
+		Rayfield:Notify({ Title = "Fly", Content = "Enabled (WASD + Camera)", Duration = 2 })
 	end
 end
 
@@ -375,7 +371,8 @@ FlyTab:CreateToggle({
 	end,
 })
 
-FlyTab:CreateSlider({
+-- Przypisano do zmiennej lokalnej, aby pętla poniżej poprawnie znalazła ten suwak
+local FlySlider = FlyTab:CreateSlider({
 	Name = "Fly Speed",
 	Range = {10, 200},
 	Increment = 5,
@@ -388,23 +385,23 @@ FlyTab:CreateSlider({
 })
 
 task.spawn(function()
-    task.wait(0.2) -- Czekamy na załadowanie elementu
-    pcall(function()
-        -- W Rayfieldzie pasek postępu suwaka to obiekt o nazwie "Fill" lub "Visual"
-        local sliderFrame = FlySlider.Instance
-        if sliderFrame then
-            for _, child in ipairs(sliderFrame:GetDescendants()) do
-                -- Szukamy niebieskiego elementu w strukturze suwaka
-                if child:IsA("Frame") and (child.Name == "Fill" or child.Name == "Visual" or child.BackgroundColor3 == Color3.fromRGB(0, 125, 255)) then
-                    child.BackgroundColor3 = Color3.fromRGB(120, 120, 120) -- Twój upragniony szary kolor
-                end
-            end
-        end
-    end)
+	task.wait(0.2)
+	pcall(function()
+		local sliderFrame = FlySlider.Instance
+		if sliderFrame then
+			for _, child in ipairs(sliderFrame:GetDescendants()) do
+				if child:IsA("Frame") and (child.Name == "Fill" or child.Name == "Visual" or child.BackgroundColor3 == Color3.fromRGB(0, 125, 255)) then
+					child.BackgroundColor3 = Color3.fromRGB(120, 120, 120) -- Zamiana koloru suwaka na szary
+				end
+			end
+		end
+	end)
 end)
 
-FlyTab:CreateButton({
-	Name = "Set Fly Keybind (Current: F)",
+-- Zapisano do zmiennej lokalnej, aby można było dynamicznie aktualizować tekst przycisku
+local KeybindButton
+KeybindButton = FlyTab:CreateButton({
+	Name = "Set Fly Keybind (Current: " .. tostring(flyKey.Name) .. ")",
 	Callback = function()
 		Rayfield:Notify({
 			Title = "Fly Keybind",
@@ -415,9 +412,15 @@ FlyTab:CreateButton({
 		conn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
 			if gameProcessed then return end
 			flyKey = input.KeyCode
+			
+			-- Dynamiczna zmiana nazwy przycisku po kliknięciu klawisza
+			pcall(function()
+				KeybindButton:Set("Set Fly Keybind (Current: " .. tostring(flyKey.Name) .. ")")
+			end)
+			
 			Rayfield:Notify({
 				Title = "Fly Keybind",
-				Content = "Set to " .. tostring(flyKey),
+				Content = "Set to " .. tostring(flyKey.Name),
 				Duration = 3,
 			})
 			conn:Disconnect()
