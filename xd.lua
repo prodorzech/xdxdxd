@@ -11,8 +11,8 @@ local Window = Rayfield:CreateWindow({
 	KeySystem = false,
 })
 
-local MainTab = Window:CreateTab("Main", nil) -- brak ikony, ale działa
-local FlyTab = Window:CreateTab("Fly", nil)   -- nowa zakładka
+local MainTab = Window:CreateTab("Main", 4483362458)
+local FlyTab = Window:CreateTab("Fly", 4483362458)
 
 --// Services
 local Players = game:GetService("Players")
@@ -40,7 +40,7 @@ if not userTycoon then
 	return
 end
 
---// Variables for tycoon
+--// Variables
 local AutoBuy = false
 local AutoUpgrade = false
 local AutoFruit = false
@@ -56,7 +56,7 @@ local flyConnection = nil
 local flyMoveConnection = nil
 local flyInputEndedConnection = nil
 
---// Tycoon functions (your original code)
+--// Tycoon functions (original)
 local function getButtons()
 	local Buttons = {}
 	for _, obj in ipairs(userTycoon.Purchases:GetDescendants()) do
@@ -216,22 +216,22 @@ local function startFly()
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if not hrp or not humanoid then return end
-	
+
 	humanoid.PlatformStand = true
-	
+
 	bodyVelocity = Instance.new("BodyVelocity")
 	bodyVelocity.MaxForce = Vector3.new(1e6, 1e6, 1e6)
 	bodyVelocity.Velocity = Vector3.new(0,0,0)
 	bodyVelocity.Parent = hrp
-	
+
 	bodyGyro = Instance.new("BodyGyro")
 	bodyGyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
 	bodyGyro.CFrame = hrp.CFrame
 	bodyGyro.Parent = hrp
-	
+
 	local moveVector = Vector3.new(0,0,0)
 	local camera = workspace.CurrentCamera
-	
+
 	local keys = { W = false, A = false, S = false, D = false, Space = false, Ctrl = false }
 	local function updateMoveVector()
 		moveVector = Vector3.new(
@@ -243,7 +243,7 @@ local function startFly()
 			moveVector = moveVector.Unit
 		end
 	end
-	
+
 	local function onInputBegan(input, gameProcessed)
 		if gameProcessed then return end
 		local key = input.KeyCode
@@ -255,7 +255,7 @@ local function startFly()
 		elseif key == Enum.KeyCode.LeftControl then keys.Ctrl = true updateMoveVector()
 		end
 	end
-	
+
 	local function onInputEnded(input, gameProcessed)
 		local key = input.KeyCode
 		if key == Enum.KeyCode.W then keys.W = false updateMoveVector()
@@ -266,10 +266,10 @@ local function startFly()
 		elseif key == Enum.KeyCode.LeftControl then keys.Ctrl = false updateMoveVector()
 		end
 	end
-	
+
 	flyMoveConnection = UserInputService.InputBegan:Connect(onInputBegan)
 	flyInputEndedConnection = UserInputService.InputEnded:Connect(onInputEnded)
-	
+
 	flyConnection = RunService.RenderStepped:Connect(function(dt)
 		if not flying then return end
 		local newChar = LocalPlayer.Character
@@ -281,13 +281,13 @@ local function startFly()
 		local newHrp = newChar:FindFirstChild("HumanoidRootPart")
 		local newHumanoid = newChar:FindFirstChildOfClass("Humanoid")
 		if not newHrp or not newHumanoid then return end
-		
+
 		local cameraCF = camera.CFrame
 		local lookVector = cameraCF.LookVector
 		local forward = Vector3.new(lookVector.X, 0, lookVector.Z).Unit
 		local right = cameraCF.RightVector
 		local up = Vector3.new(0,1,0)
-		
+
 		local direction = (forward * moveVector.Z + right * moveVector.X + up * moveVector.Y)
 		if direction.Magnitude > 0 then
 			direction = direction.Unit
@@ -324,8 +324,7 @@ LocalPlayer.CharacterAdded:Connect(function()
 	end
 end)
 
---// UI ELEMENTS
--- Main Tab (your original)
+--// UI Elements
 MainTab:CreateToggle({
 	Name = "Auto Buy",
 	CurrentValue = false,
@@ -363,7 +362,6 @@ MainTab:CreateButton({
 	end,
 })
 
--- Fly Tab
 FlyTab:CreateToggle({
 	Name = "Fly (Toggle)",
 	CurrentValue = false,
@@ -414,7 +412,6 @@ FlyTab:CreateButton({
 	end,
 })
 
--- Final notification
 Rayfield:Notify({
 	Title = "Loaded",
 	Content = "Tycoon Autofarm + Fly Loaded Successfully",
