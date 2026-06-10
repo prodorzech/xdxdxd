@@ -11,8 +11,8 @@ local Window = Rayfield:CreateWindow({
 	KeySystem = false,
 })
 
-local MainTab = Window:CreateTab("Main", 4483362458)
-local FlyTab = Window:CreateTab("Fly", 4483362459) -- nowa zakładka
+local MainTab = Window:CreateTab("Main", nil) -- brak ikony, ale działa
+local FlyTab = Window:CreateTab("Fly", nil)   -- nowa zakładka
 
 --// Services
 local Players = game:GetService("Players")
@@ -46,7 +46,7 @@ local AutoUpgrade = false
 local AutoFruit = false
 local Buying = false
 
---// Variables for fly
+--// FLY variables
 local flying = false
 local flySpeed = 50
 local flyKey = Enum.KeyCode.F
@@ -54,8 +54,9 @@ local bodyVelocity = nil
 local bodyGyro = nil
 local flyConnection = nil
 local flyMoveConnection = nil
+local flyInputEndedConnection = nil
 
---// Tycoon functions (existing)
+--// Tycoon functions (your original code)
 local function getButtons()
 	local Buttons = {}
 	for _, obj in ipairs(userTycoon.Purchases:GetDescendants()) do
@@ -192,12 +193,13 @@ task.spawn(function()
 	end
 end)
 
---// FLY FUNCTIONALITY
+--// FLY FUNCTIONS
 local function stopFly()
 	if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
 	if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
 	if flyConnection then flyConnection:Disconnect() flyConnection = nil end
 	if flyMoveConnection then flyMoveConnection:Disconnect() flyMoveConnection = nil end
+	if flyInputEndedConnection then flyInputEndedConnection:Disconnect() flyInputEndedConnection = nil end
 	local character = LocalPlayer.Character
 	if character then
 		local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -208,7 +210,7 @@ local function stopFly()
 end
 
 local function startFly()
-	stopFly() -- clear previous
+	stopFly()
 	local character = LocalPlayer.Character
 	if not character then return end
 	local hrp = character:FindFirstChild("HumanoidRootPart")
@@ -217,13 +219,11 @@ local function startFly()
 	
 	humanoid.PlatformStand = true
 	
-	-- BodyVelocity for movement
 	bodyVelocity = Instance.new("BodyVelocity")
 	bodyVelocity.MaxForce = Vector3.new(1e6, 1e6, 1e6)
 	bodyVelocity.Velocity = Vector3.new(0,0,0)
 	bodyVelocity.Parent = hrp
 	
-	-- BodyGyro for orientation (to face direction of movement)
 	bodyGyro = Instance.new("BodyGyro")
 	bodyGyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
 	bodyGyro.CFrame = hrp.CFrame
@@ -232,7 +232,6 @@ local function startFly()
 	local moveVector = Vector3.new(0,0,0)
 	local camera = workspace.CurrentCamera
 	
-	-- Handle input for movement (WASD + space/ctrl for up/down)
 	local keys = { W = false, A = false, S = false, D = false, Space = false, Ctrl = false }
 	local function updateMoveVector()
 		moveVector = Vector3.new(
@@ -269,14 +268,12 @@ local function startFly()
 	end
 	
 	flyMoveConnection = UserInputService.InputBegan:Connect(onInputBegan)
-	local inputEndedConn = UserInputService.InputEnded:Connect(onInputEnded)
+	flyInputEndedConnection = UserInputService.InputEnded:Connect(onInputEnded)
 	
-	-- Flight loop
 	flyConnection = RunService.RenderStepped:Connect(function(dt)
 		if not flying then return end
 		local newChar = LocalPlayer.Character
 		if not newChar or newChar ~= character then
-			-- character died or changed
 			flying = false
 			stopFly()
 			return
@@ -285,7 +282,6 @@ local function startFly()
 		local newHumanoid = newChar:FindFirstChildOfClass("Humanoid")
 		if not newHrp or not newHumanoid then return end
 		
-		-- Update gyro to face camera direction (horizontal)
 		local cameraCF = camera.CFrame
 		local lookVector = cameraCF.LookVector
 		local forward = Vector3.new(lookVector.X, 0, lookVector.Z).Unit
@@ -296,15 +292,11 @@ local function startFly()
 		if direction.Magnitude > 0 then
 			direction = direction.Unit
 		end
-		local velocity = direction * flySpeed
-		bodyVelocity.Velocity = velocity
-		
-		-- Set gyro to face camera direction (so player looks where they are going)
+		bodyVelocity.Velocity = direction * flySpeed
 		bodyGyro.CFrame = CFrame.lookAt(newHrp.Position, newHrp.Position + cameraCF.LookVector)
 	end)
 end
 
--- Toggle fly function
 local function toggleFly()
 	if flying then
 		flying = false
@@ -317,7 +309,7 @@ local function toggleFly()
 	end
 end
 
--- Handle key press for toggle (default F)
+-- Keybind
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	if input.KeyCode == flyKey then
@@ -325,67 +317,15 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
--- Also stop fly on character death
 LocalPlayer.CharacterAdded:Connect(function()
 	if flying then
-		-- Disable fly on respawn, but keep flag so user can re-enable
 		flying = false
 		stopFly()
 	end
 end)
 
---// UI for Fly Tab
-FlyTab:CreateToggle({
-	Name = "Fly (Toggle)",
-	CurrentValue = false,
-	Flag = "FlyToggle",
-	Callback = function(Value)
-		if Value then
-			if not flying then toggleFly() end
-		else
-			if flying then toggleFly() end
-		end
-	end,
-})
-
-FlyTab:CreateSlider({
-	Name = "Fly Speed",
-	Range = {10, 200},
-	Increment = 5,
-	Suffix = "studs/s",
-	CurrentValue = flySpeed,
-	Flag = "FlySpeed",
-	Callback = function(Value)
-		flySpeed = Value
-	end,
-})
-
-FlyTab:CreateButton({
-	Name = "Set Fly Keybind (Current: F)",
-	Callback = function()
-		Rayfield:Notify({
-			Title = "Fly Keybind",
-			Content = "Press any key within 5 seconds...",
-			Duration = 5,
-		})
-		local connection
-		connection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-			if gameProcessed then return end
-			flyKey = input.KeyCode
-			Rayfield:Notify({
-				Title = "Fly Keybind",
-				Content = "Set to " .. tostring(flyKey),
-				Duration = 3,
-			})
-			connection:Disconnect()
-		end)
-		task.delay(5, function()
-			if connection then connection:Disconnect() end
-		end)
-	end,
-})
-
---// Existing MainTab toggles
+--// UI ELEMENTS
+-- Main Tab (your original)
 MainTab:CreateToggle({
 	Name = "Auto Buy",
 	CurrentValue = false,
@@ -423,6 +363,58 @@ MainTab:CreateButton({
 	end,
 })
 
+-- Fly Tab
+FlyTab:CreateToggle({
+	Name = "Fly (Toggle)",
+	CurrentValue = false,
+	Flag = "FlyToggle",
+	Callback = function(Value)
+		if Value then
+			if not flying then toggleFly() end
+		else
+			if flying then toggleFly() end
+		end
+	end,
+})
+
+FlyTab:CreateSlider({
+	Name = "Fly Speed",
+	Range = {10, 200},
+	Increment = 5,
+	Suffix = "studs/s",
+	CurrentValue = flySpeed,
+	Flag = "FlySpeed",
+	Callback = function(Value)
+		flySpeed = Value
+	end,
+})
+
+FlyTab:CreateButton({
+	Name = "Set Fly Keybind (Current: F)",
+	Callback = function()
+		Rayfield:Notify({
+			Title = "Fly Keybind",
+			Content = "Press any key within 5 seconds...",
+			Duration = 5,
+		})
+		local conn
+		conn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+			if gameProcessed then return end
+			flyKey = input.KeyCode
+			Rayfield:Notify({
+				Title = "Fly Keybind",
+				Content = "Set to " .. tostring(flyKey),
+				Duration = 3,
+			})
+			conn:Disconnect()
+		end)
+		task.delay(5, function()
+			if conn then conn:Disconnect() end
+		end)
+	end,
+})
+
+-- Final notification
 Rayfield:Notify({
 	Title = "Loaded",
 	Content = "Tycoon Autofarm + Fly Loaded Successfully",
